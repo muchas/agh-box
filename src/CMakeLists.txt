@@ -3,4 +3,8 @@ set(CMAKE_BUILD_TYPE Debug)
 enable_testing()
 add_executable (server server.c)
 add_executable (client client.c)
+add_library(utils SHARED utils.c)
+
 target_link_libraries(client LINK_PUBLIC pthread)
+target_link_libraries(server LINK_PUBLIC utils)
+target_link_libraries(client LINK_PUBLIC utils)

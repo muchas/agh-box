@@ -1,6 +1,8 @@
 #ifndef message_h
 #define message_h
 
+#include <stdlib.h>
+
 typedef enum {
     SERVER_BOX,
     FILE_REQUEST,

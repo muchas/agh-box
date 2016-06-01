@@ -1,6 +1,16 @@
-#include <stdio.h>
+#include "server.h"
 #include "message.h"
+#include "utils.h"
 
 int main(){
-    return 0;
+    struct sockaddr addr;
+    socklen_t len;
+
+    int socket = init_server_socket(9000);
+    accept(socket, &addr, &len);
+
+    printf("Success\n");
+    return EXIT_SUCCESS;
 }
+
+
