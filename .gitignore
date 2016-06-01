@@ -1,0 +1,6 @@
+/Release/
+CMakeFiles/
+*.cmake
+CMakeCache.txt
+Makefile
+*.dir/
