@@ -13,7 +13,7 @@ typedef enum {
     CLIENT_FILE
 } message_type_t;
 
-typedef struct{
+typedef struct {
     message_type_t message_type;
     size_t size;
     char name[MAX_PATHLEN];
