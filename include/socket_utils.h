@@ -1,5 +1,5 @@
-#ifndef utils_h
-#define utils_h
+#ifndef socket_utils_h
+#define socket_utils_h
 
 #include <stdio.h>
 #include <netinet/ip.h>

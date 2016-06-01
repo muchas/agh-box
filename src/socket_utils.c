@@ -3,7 +3,7 @@
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
-#include "utils.h"
+#include "socket_utils.h"
 
 struct sockaddr_in get_sockaddr(int port, uint32_t s_addr){
     struct sockaddr_in addr;
