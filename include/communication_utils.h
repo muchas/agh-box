@@ -1,5 +1,8 @@
-#ifndef message_h
-#define message_h
+#ifndef communication_utils_h
+#define communication_utils_h
+
+#define MAX_PATHLEN 128
+#define BUFSIZE 128
 
 #include <stdlib.h>
 
@@ -13,6 +16,6 @@ typedef enum {
 typedef struct{
     message_type_t message_type;
     size_t size;
-    char* name;
+    char name[MAX_PATHLEN];
 } message_info_t;
 #endif
