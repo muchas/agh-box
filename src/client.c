@@ -1,10 +1,11 @@
 #include <pthread.h>
 #include <unistd.h>
-#include "message.h"
+#include <communication_utils.h>
 #include "socket_utils.h"
-#define SYNC_TIME 10
+#include "communication_utils.h"
 #define SERVER_BOX_FILENAME ".server_box"
 #define LOCAL_BOX_FILENAME ".box"
+#define SYNC_TIME 10
 
 
 
@@ -36,8 +37,29 @@ void* track_directory(void *parameters)
 }
 
 
-void receive_server_box(int socket_fd)
+box_entry_t* receive_server_box(int socket_fd)
 {
+    box_entry_t *box_entries;
+    message_info_t message_info;
+    FILE* file;
+
+    message_info = receive_message_info(socket_fd);
+
+    if(!message_info.message_type == MESSAGE_BOX) {
+        printf("Message box expected\n");
+        exit(EXIT_FAILURE);
+    }
+
+    receive_file(socket_fd, SERVER_BOX_FILENAME, message_info.size);
+
+    box_entries = malloc(message_info.size);
+
+    file = fopen(SERVER_BOX_FILENAME, "r");
+    fread()
+
+    fclose(file);
+
+    return box_entries;
 
 }
 
@@ -45,8 +67,6 @@ void receive_server_box(int socket_fd)
 void initialize_local_box()
 {
     if(file_exists(LOCAL_BOX_FILENAME)) return;
-
-
 }
 
 
