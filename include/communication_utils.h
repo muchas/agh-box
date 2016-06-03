@@ -18,4 +18,6 @@ typedef struct{
     size_t size;
     char name[MAX_PATHLEN];
 } message_info_t;
+
+void send_file(int socket, const char* path, message_type_t type);
 #endif
