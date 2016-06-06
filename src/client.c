@@ -172,7 +172,6 @@ stack_t* detect_local_changes(file_t *local_files, box_entry_t* box_entries)
 }
 
 
-
 int push_local_changes(stack_t* changes)
 {
     message_info_t* message;
@@ -199,24 +198,61 @@ int push_local_changes(stack_t* changes)
 }
 
 
+stack_t *detect_server_changes(box_entry_t* local_box_entries, box_entry_t* server_box_entries)
+{
+    stack_t *stack;
+    box_entry_t *local_it, *server_it;
+    message_info_t *message;
+
+    stack = init_stack();
+
+    server_it = server_box_entries;
+
+    while(server_it->next != NULL) {
+        local_it = find_in_box(local_box_entries, server_it->path);
+        if(local_it == NULL || server_it->global_timestamp > local_it->global_timestamp) {
+            message = create_info_message(FILE_REQUEST, server_it->path, server_it->global_timestamp, 0);
+            push(stack, message);
+        }
+        server_it = server_it->next;
+    }
+
+    return stack;
+}
 
 
-//
-//
-//int detect_server_changes(box_entry_t* local_box_entries, box_entry_t* server_box_entries, queue_t* changes)
-//{
-//    return -1;
-//}
-//
-//
-//int apply_server_changes(queue_t *changes)
-//{
-//    return -1;
-//}
+int apply_server_changes(stack_t *changes)
+{
+    message_info_t *message, received_message;
+    struct stat st;
 
+    while((message = (message_info_t *) pop(changes)) != NULL) {
+        switch(message->message_type) {
+            case FILE_REQUEST:
+                printf("FILE REQUEST, requesting file: %s\n", message->name);
+                send_message_info(socket_fd, FILE_REQUEST, message->name, 0);
+                received_message = receive_message_info(socket_fd);
 
+                if(received_message.message_type == SERVER_FILE) {
+                    printf("Receiving file from server...\n");
+                    receive_file(socket_fd, received_message.name, received_message.size);
+                    printf("Server file has been received...\n");
+                    stat(received_message.name, &st);
+                    create_or_update(local_box, received_message.name, received_message.size, st.st_mtime, received_message.modification_time);
+                } else if(received_message.message_type == SERVER_BOX) {
+                    printf("Hey server, you fucked up\n");
+                }
+                break;
+            default:
+                printf("I have no idea what is happening here - \n");
+                break;
+        }
+    }
 
+    printf("Server changes applied\n");
 
+    return 0;
+}
 
 
 
@@ -235,19 +271,26 @@ box_entry_t* receive_server_box(int socket_fd)
 
     return read_box(SERVER_BOX_FILENAME);
 }
-//
 
-//void* pull_changes(void *parameters)
-//{
-//    while(1) {
-//        receive_server_box(socket_fd);
-//
-//
-//    }
-//
-//    return NULL;
-//}
-//
+void* pull_changes(void *parameters)
+{
+    stack_t *changes;
+
+    int i;
+    i = 0;
+    while(1) {
+        receive_server_box(socket_fd);
+        changes = detect_server_changes(local_box, server_box);
+        apply_server_changes(changes);
+        write_box(LOCAL_BOX_FILENAME, local_box);
+
+        printf("Iteration: %d\n", i);
+        i += 1;
+    }
+
+    return NULL;
+}
+
 
 void* track_directory(void *parameters)
 {
