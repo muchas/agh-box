@@ -65,6 +65,7 @@ message_info_t receive_message_info(int socket){
     return info;
 }
 
+
 void receive_file(int socket, const char* new_path, size_t size){
     int len;
     FILE* file;
@@ -77,4 +78,5 @@ void receive_file(int socket, const char* new_path, size_t size){
         fwrite(buffer, sizeof(char), len, file);
         remain_data -= len;
     }
+    fclose(file);
 }
