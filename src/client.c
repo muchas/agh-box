@@ -166,6 +166,39 @@ stack_t* detect_local_changes(file_t *local_files, box_entry_t* box_entries)
 }
 
 
+box_entry_t* find_in_box(box_entry_t *box_entry, char *name)
+{
+    box_entry_t *it;
+
+    it = box_entry;
+
+    while(it->next != NULL) {
+        if(strcmp(it->path, name) == 0) {
+            return it;
+        }
+    }
+
+    return NULL;
+}
+
+
+void create_or_update(box_entry_t *box_entry, char *name, size_t size, time_t local_time, time_t server_time)
+{
+    box_entry_t *entry;
+
+    entry = find_in_box(box_entry, name);
+    strcpy(box_entry->path, name);
+
+    if(local_time != NULL) {
+        entry->local_timestamp = local_time;
+    }
+
+    if(server_time != NULL) {
+        entry->global_timestamp = server_time;
+    }
+}
+
+
 int push_local_changes(stack_t* changes)
 {
     message_info_t* message;
@@ -174,7 +207,7 @@ int push_local_changes(stack_t* changes)
         switch(message->message_type) {
             case CLIENT_FILE:
                 send_file(socket_fd, message->name, message->message_type);
-//                create_or_update(local_box, message->name, message->);
+                create_or_update(local_box, message->name, message->size, message->modification_time, NULL);
                 break;
             case FILE_REMOVAL:
                 printf("FILE REMOVAL; LET'S PRETEND IT'S REMOVED. TODO :-)\n");
@@ -263,6 +296,12 @@ void* track_directory(void *parameters)
     }
 
     return NULL;
+}
+
+
+void init()
+{
+
 }
 
 
