@@ -2,6 +2,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <file_utils.h>
 #include <communication_utils.h>
@@ -301,7 +302,19 @@ void* track_directory(void *parameters)
 
 void init()
 {
+    int fd;
+    file_t *local_files;
+    stack_t *changes;
 
+    if(!file_exists(LOCAL_BOX_FILENAME))  {
+        fd = creat(LOCAL_BOX_FILENAME, 0666);
+        close(fd);
+    }
+
+    local_files = get_local_files_list(".");
+    changes = detect_local_changes(local_files, local_box);
+    push_local_changes(changes);
+    write_box(LOCAL_BOX_FILENAME, local_box);
 }
 
 
