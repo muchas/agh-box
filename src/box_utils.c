@@ -56,8 +56,6 @@ int write_box(char *path, box_entry_t *entries)
     handler = fopen(path, "w");
     it = entries;
 
-    printf("Writing to local box\n");
-
     while(it->next != NULL) {
         fwrite(it, sizeof(box_entry_t), 1, handler);
         it = it->next;

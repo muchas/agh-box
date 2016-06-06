@@ -114,8 +114,8 @@ stack_t* detect_local_changes(file_t *local_files, box_entry_t* box_entries)
 
     files_it = local_files;
 
-    printf("Printing local box in detect_local_changes\n");
-    print_box(box_entries);
+//    printf("Printing local box in detect_local_changes\n");
+//    print_box(box_entries);
 
     while(files_it->next != NULL) {
         box_it = box_entries;
@@ -180,7 +180,7 @@ int push_local_changes(stack_t* changes)
         switch(message->message_type) {
             case CLIENT_FILE:
                 printf("CLIENT_FILE, sending file to server, filename: %s\n", message->name);
-                send_file(socket_fd, message->name, message->message_type);
+                send_file(socket_fd, message->name, message->message_type, message->modification_time);
                 create_or_update(local_box, message->name, message->size, message->modification_time, message->modification_time);
                 break;
             case FILE_REMOVAL:
@@ -230,7 +230,7 @@ int apply_server_changes(stack_t *changes)
         switch(message->message_type) {
             case FILE_REQUEST:
                 printf("FILE REQUEST, requesting file: %s\n", message->name);
-                send_message_info(socket_fd, FILE_REQUEST, message->name, 0);
+                send_message_info(socket_fd, FILE_REQUEST, message->name, 0, 0);
                 received_message = receive_message_info(socket_fd);
 
                 if(received_message.message_type == SERVER_FILE) {
@@ -279,7 +279,7 @@ void* pull_changes(void *parameters)
     int i;
     i = 0;
     while(1) {
-        receive_server_box(socket_fd);
+        server_box = receive_server_box(socket_fd);
         changes = detect_server_changes(local_box, server_box);
         apply_server_changes(changes);
         write_box(LOCAL_BOX_FILENAME, local_box);
@@ -302,15 +302,15 @@ void* track_directory(void *parameters)
     while(1) {
         // acquire lock]
         local_files = get_local_files_list(".");
-        printf("Got local files list\n");
+//        printf("Got local files list\n");
         changes = detect_local_changes(local_files, local_box);
-        printf("Changes has been detected\n");
-        printf("Pushing local changes\n");
+//        printf("Changes has been detected\n");
+//        printf("Pushing local changes\n");
         push_local_changes(changes);
-        printf("Writing to local box\n");
+//        printf("Writing to local box\n");
         write_box(LOCAL_BOX_FILENAME, local_box);
         // release lock
-        printf("Iteration: %d\n", i);
+//        printf("Iteration: %d\n", i);
         i += 1;
         sleep(SYNC_TIME);
     }
@@ -334,6 +334,12 @@ void init()
 
     local_box = read_box(LOCAL_BOX_FILENAME);
 
+    // pull
+    changes = detect_server_changes(local_box, server_box);
+    apply_server_changes(changes);
+    write_box(LOCAL_BOX_FILENAME, local_box);
+
+    // push
     local_files = get_local_files_list(".");
     changes = detect_local_changes(local_files, local_box);
     push_local_changes(changes);
@@ -347,7 +353,7 @@ int main(int argc, char *argv[])
 
     pthread_t tracker_id, listener_id;
 
-    chdir("./client_");
+    chdir(argv[3]);
 
     socket_fd = get_client_socket(argv[1], atoi(argv[2]));
 
@@ -358,13 +364,13 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-//    if(pthread_create(&listener_id, NULL, &pull_changes, NULL) < 0) {
-//        perror("pthread_create failed");
-//        return EXIT_FAILURE;
-//    }
+    if(pthread_create(&listener_id, NULL, &pull_changes, NULL) < 0) {
+        perror("pthread_create failed");
+        return EXIT_FAILURE;
+    }
 
     if(pthread_join(tracker_id, NULL) < 0) { perror("pthread_join failed"); return EXIT_FAILURE; }
-//    if(pthread_join(listener_id, NULL) < 0) { perror("pthread_join failed"); return EXIT_FAILURE; }
+    if(pthread_join(listener_id, NULL) < 0) { perror("pthread_join failed"); return EXIT_FAILURE; }
 
     return EXIT_SUCCESS;
 }

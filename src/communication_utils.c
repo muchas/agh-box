@@ -5,15 +5,17 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <communication_utils.h>
 #include "communication_utils.h"
 
 
-void send_message_info(int socket, message_type_t type, const char* path, size_t size)
+void send_message_info(int socket, message_type_t type, const char* path, size_t size, time_t mod_time)
 {
     message_info_t info;
     info.message_type = type;
     strncpy(info.name, path, MAX_PATHLEN);
     info.size = size;
+    info.modification_time = mod_time;
 
     if(write(socket, &info, sizeof(message_info_t)) < sizeof(info))
     {
@@ -37,7 +39,7 @@ void send_file_data(int socket, int fd, size_t size)
     printf("File has been sent\n");
 }
 
-void send_file(int socket, const char* path, message_type_t type){
+void send_file(int socket, const char* path, message_type_t type, time_t mod_time){
     int fd;
     struct stat file_stat;
 
@@ -54,7 +56,7 @@ void send_file(int socket, const char* path, message_type_t type){
     }
 
     printf("Sending message info, size: %d\n", file_stat.st_size);
-    send_message_info(socket, type, path, file_stat.st_size);
+    send_message_info(socket, type, path, file_stat.st_size, mod_time);
     printf("Sending file data\n");
     send_file_data(socket, fd, file_stat.st_size);
 }
