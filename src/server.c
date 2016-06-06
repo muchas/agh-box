@@ -2,6 +2,9 @@
 #include "server.h"
 #include "communication_utils.h"
 #include "socket_utils.h"
+#define SERVER_BOX_FILENAME ".server_box"
+#define LOCAL_BOX_FILENAME ".box"
+
 
 int main(){
     struct sockaddr addr;
@@ -78,7 +81,8 @@ void handle_file_request(int socket, message_info_t info){
 }
 
 void handle_client_file(int socket, message_info_t info){
-
+    box_entry_t* head;
+    head = read_box(SERVER_BOX_FILENAME);
 }
 
 void handle_client_message(int socket){
