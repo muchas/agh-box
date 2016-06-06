@@ -5,12 +5,13 @@
 
 int main(){
     struct sockaddr addr;
+    server_t server;
     socklen_t len;
 
     int socket = init_server_socket(9000);
-    accept(socket, &addr, &len);
+    server=get_server(socket);
+    run(server);
 
-    printf("Success\n");
     return EXIT_SUCCESS;
 }
 
@@ -76,6 +77,10 @@ void handle_file_request(int socket, message_info_t info){
     send_file(socket, info.name, SERVER_FILE);
 }
 
+void handle_client_file(int socket, message_info_t info){
+
+}
+
 void handle_client_message(int socket){
     message_info_t info;
     read(socket, &info, sizeof(info));
@@ -83,6 +88,8 @@ void handle_client_message(int socket){
     switch(info.message_type){
         case FILE_REQUEST:
             handle_file_request(socket, info);
+        case CLIENT_FILE:
+            handle_client_file(socket, info);
         default:
             break;
     }
