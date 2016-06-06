@@ -1,21 +1,23 @@
 #include <sys/select.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <server.h>
+#include <communication_utils.h>
 #include "server.h"
 #include "communication_utils.h"
+#include "box_utils.h"
 #include "socket_utils.h"
-#define SERVER_BOX_FILENAME ".server_box"
-#define LOCAL_BOX_FILENAME ".box"
+#define SERVER_BOX_FILENAME ".origin_server_box"
 
 
-int main(){
-    struct sockaddr addr;
-    server_t server;
-    socklen_t len;
+int max(int a, int b) {
+    return a > b ? a : b;
+}
 
-    int socket = init_server_socket(9000);
-    server=get_server(socket);
-    run(server);
 
-    return EXIT_SUCCESS;
+int file_exists(char* filename)
+{
+    return access(filename, F_OK);
 }
 
 
@@ -60,11 +62,22 @@ server_t get_server(int socket){
 void register_client(server_t* server){
     int client_fd;
     client_fd = accept(server->socket, NULL, 0);
+
+    printf("Registering new client, fd: %d \n", client_fd);
+
     if(client_fd<0){
         perror("accept error");
         exit(EXIT_FAILURE);
     }
+
+    server->highest_fd = max(server->highest_fd, client_fd);
+    FD_SET(client_fd, &server->server_fd_set);
+
     add_client(client_fd, server->client_array, &server->client_num);
+
+    printf("Sending server box to client\n");
+
+    send_file(client_fd, SERVER_BOX_FILENAME, SERVER_BOX);
 }
 
 void add_client(int socket, int* client_array, int* client_num){
@@ -80,21 +93,62 @@ void handle_file_request(int socket, message_info_t info){
     send_file(socket, info.name, SERVER_FILE);
 }
 
-void handle_client_file(int socket, message_info_t info){
+void handle_client_file(int socket, message_info_t *info){
     box_entry_t* head;
+
+    receive_file(socket, info->name, info->size);
+
     head = read_box(SERVER_BOX_FILENAME);
+    create_or_update(head, info->name, info->size, 0, info->modification_time);
+
+
+    // broadcast
 }
 
 void handle_client_message(int socket){
+    ssize_t read_bytes;
     message_info_t info;
-    read(socket, &info, sizeof(info));
+
+    read_bytes = read(socket, &info, sizeof(info));
+
+    printf("Handle client message, size: %d\n", read_bytes);
 
     switch(info.message_type){
         case FILE_REQUEST:
             handle_file_request(socket, info);
         case CLIENT_FILE:
-            handle_client_file(socket, info);
+            printf("Received CLIENT_FILE %s\n", info.name);
+            handle_client_file(socket, &info);
         default:
             break;
     }
+}
+
+
+void init()
+{
+    int fd;
+
+    if(file_exists(SERVER_BOX_FILENAME) != 0)  {
+        printf("Creating server box\n");
+        fd = creat(SERVER_BOX_FILENAME, 0666);
+        close(fd);
+    }
+}
+
+
+int main(int argc, char *argv[]){
+    struct sockaddr addr;
+    server_t server;
+    socklen_t len;
+
+    chdir("./server_");
+
+    init();
+
+    int socket = init_server_socket(atoi(argv[1]));
+    server=get_server(socket);
+    run(server);
+
+    return EXIT_SUCCESS;
 }

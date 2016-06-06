@@ -56,6 +56,8 @@ int write_box(char *path, box_entry_t *entries)
     handler = fopen(path, "w");
     it = entries;
 
+    printf("Writing to local box\n");
+
     while(it->next != NULL) {
         fwrite(it, sizeof(box_entry_t), 1, handler);
         it = it->next;
@@ -71,5 +73,46 @@ void print_box(box_entry_t* head)
     while(head->next != NULL) {
         printf("%s\n", head->path);
         head = head->next;
+    }
+}
+
+
+box_entry_t* find_in_box(box_entry_t *box_entry, char *name)
+{
+    box_entry_t *it;
+
+    it = box_entry;
+
+    while(it->next != NULL) {
+        if(strcmp(it->path, name) == 0) {
+            return it;
+        }
+        it = it->next;
+    }
+
+    return NULL;
+}
+
+
+void create_or_update(box_entry_t *box_entry, char *name, size_t size, time_t local_time, time_t server_time)
+{
+    box_entry_t *entry;
+
+    entry = find_in_box(box_entry, name);
+
+    printf("Updating box... Name: %s, local time: %d\n", name, local_time);
+
+    if(entry == NULL) {
+        insert_into_box(box_entry, name, server_time, local_time, -1);
+    } else {
+        strcpy(box_entry->path, name);
+
+        if(local_time != 0) {
+            entry->local_timestamp = local_time;
+        }
+
+        if(server_time != 0) {
+            entry->global_timestamp = server_time;
+        }
     }
 }

@@ -13,7 +13,7 @@
 #include "box_utils.h"
 #define SERVER_BOX_FILENAME ".server_box"
 #define LOCAL_BOX_FILENAME ".box"
-#define SYNC_TIME 10
+#define SYNC_TIME 1
 typedef struct dirent dirent_t;
 typedef struct stat  stat_t;
 
@@ -40,8 +40,6 @@ int file_exists(char* filename)
 {
     return access(filename, F_OK);
 }
-
-
 
 
 
@@ -79,7 +77,7 @@ file_t* get_local_files_list(char* name) // returns: number of entries, -1 on er
         sprintf(entry_path, "%s/%s", name, ent->d_name);
         stat(entry_path, &entry_stat);
 
-        if(S_ISREG(entry_stat.st_mode)) {
+        if(S_ISREG(entry_stat.st_mode) && ent->d_name[0] != '.') {
             file_it->size = (int) entry_stat.st_size;
             file_it->path = strdup(entry_path);
             file_it->is_directory = -1;
@@ -116,15 +114,20 @@ stack_t* detect_local_changes(file_t *local_files, box_entry_t* box_entries)
 
     files_it = local_files;
 
+    printf("Printing local box in detect_local_changes\n");
+    print_box(box_entries);
+
     while(files_it->next != NULL) {
         box_it = box_entries;
         is_found = -1;
 
         while(box_it->next != NULL) {
             if(strcmp(files_it->path, box_it->path) == 0) {
+                is_found = 1;
+
                 if(files_it->modification_time > box_it->local_timestamp) {
+                    printf("Modification time > local timestamp\n");
                     message = create_info_message(CLIENT_FILE, files_it->path, files_it->modification_time, (size_t)files_it->size);
-                    is_found = 1;
                     push(stack, message);
                     break;
                 }
@@ -133,6 +136,7 @@ stack_t* detect_local_changes(file_t *local_files, box_entry_t* box_entries)
         }
 
         if(is_found < 0) {
+            printf("File is not found in the local box\n");
             message = create_info_message(CLIENT_FILE, files_it->path, files_it->modification_time, (size_t)files_it->size);
             push(stack, message);
         }
@@ -156,6 +160,7 @@ stack_t* detect_local_changes(file_t *local_files, box_entry_t* box_entries)
         }
 
         if(is_found < 0) {
+            printf("Box entry is not found in the files\n");
             message = create_info_message(FILE_REMOVAL, box_it->path, time(NULL), 0);
             push(stack, message);
         }
@@ -167,38 +172,6 @@ stack_t* detect_local_changes(file_t *local_files, box_entry_t* box_entries)
 }
 
 
-box_entry_t* find_in_box(box_entry_t *box_entry, char *name)
-{
-    box_entry_t *it;
-
-    it = box_entry;
-
-    while(it->next != NULL) {
-        if(strcmp(it->path, name) == 0) {
-            return it;
-        }
-    }
-
-    return NULL;
-}
-
-
-void create_or_update(box_entry_t *box_entry, char *name, size_t size, time_t local_time, time_t server_time)
-{
-    box_entry_t *entry;
-
-    entry = find_in_box(box_entry, name);
-    strcpy(box_entry->path, name);
-
-    if(local_time != NULL) {
-        entry->local_timestamp = local_time;
-    }
-
-    if(server_time != NULL) {
-        entry->global_timestamp = server_time;
-    }
-}
-
 
 int push_local_changes(stack_t* changes)
 {
@@ -207,8 +180,9 @@ int push_local_changes(stack_t* changes)
     while((message = (message_info_t *) pop(changes)) != NULL) {
         switch(message->message_type) {
             case CLIENT_FILE:
+                printf("CLIENT_FILE, sending file to server, filename: %s\n", message->name);
                 send_file(socket_fd, message->name, message->message_type);
-                create_or_update(local_box, message->name, message->size, message->modification_time, NULL);
+                create_or_update(local_box, message->name, message->size, message->modification_time, message->modification_time);
                 break;
             case FILE_REMOVAL:
                 printf("FILE REMOVAL; LET'S PRETEND IT'S REMOVED. TODO :-)\n");
@@ -218,6 +192,8 @@ int push_local_changes(stack_t* changes)
                 break;
         }
     }
+
+    printf("Local changes pushed\n");
 
     return 0;
 }
@@ -243,30 +219,22 @@ int push_local_changes(stack_t* changes)
 
 
 
-//
-//box_entry_t* receive_server_box(int socket_fd)
-//{
-//    box_entry_t *box_entries;
-//    message_info_t message_info;
-//
-//    message_info = receive_message_info(socket_fd);
-//
-//    if(!message_info.message_type == MESSAGE_BOX) {
-//        printf("Message box expected\n");
-//        exit(EXIT_FAILURE);
-//    }
-//
-//    receive_file(socket_fd, SERVER_BOX_FILENAME, message_info.size);
-//
-//    box_entries = malloc(message_info.size);
-//
-//    if(read_box(SERVER_BOX_FILENAME, box_entries) < 0) {
-//        perror("reading server box failed\n");
-//        return NULL;
-//    }
-//
-//    return box_entries;
-//}
+
+box_entry_t* receive_server_box(int socket_fd)
+{
+    message_info_t message_info;
+
+    message_info = receive_message_info(socket_fd);
+
+    if(!message_info.message_type == SERVER_BOX) {
+        printf("Message box expected\n");
+        exit(EXIT_FAILURE);
+    }
+
+    receive_file(socket_fd, SERVER_BOX_FILENAME, message_info.size);
+
+    return read_box(SERVER_BOX_FILENAME);
+}
 //
 
 //void* pull_changes(void *parameters)
@@ -286,13 +254,21 @@ void* track_directory(void *parameters)
     stack_t *changes;
     file_t *local_files;
 
+    int i;
+    i = 0;
     while(1) {
-        // acquire lock
+        // acquire lock]
         local_files = get_local_files_list(".");
+        printf("Got local files list\n");
         changes = detect_local_changes(local_files, local_box);
+        printf("Changes has been detected\n");
+        printf("Pushing local changes\n");
         push_local_changes(changes);
+        printf("Writing to local box\n");
         write_box(LOCAL_BOX_FILENAME, local_box);
         // release lock
+        printf("Iteration: %d\n", i);
+        i += 1;
         sleep(SYNC_TIME);
     }
 
@@ -306,10 +282,14 @@ void init()
     file_t *local_files;
     stack_t *changes;
 
-    if(!file_exists(LOCAL_BOX_FILENAME))  {
+    server_box = receive_server_box(socket_fd);
+
+    if(file_exists(LOCAL_BOX_FILENAME) != 0)  {
         fd = creat(LOCAL_BOX_FILENAME, 0666);
         close(fd);
     }
+
+    local_box = read_box(LOCAL_BOX_FILENAME);
 
     local_files = get_local_files_list(".");
     changes = detect_local_changes(local_files, local_box);
@@ -322,24 +302,26 @@ void init()
 int main(int argc, char *argv[])
 {
 
-//    pthread_t tracker_id, listener_id;
-//
-//    socket_fd = get_client_socket(argv[1], atoi(argv[2]));
-//    server_box = receive_server_box(socket_fd);
-//
-//
-//    if(pthread_create(&tracker_id, NULL, &track_directory, NULL) < 0) {
-//        perror("pthread_create failed");
-//        return EXIT_FAILURE;
-//    }
-//
+    pthread_t tracker_id, listener_id;
+
+    chdir("./client_");
+
+    socket_fd = get_client_socket(argv[1], atoi(argv[2]));
+
+    init();
+
+    if(pthread_create(&tracker_id, NULL, &track_directory, NULL) < 0) {
+        perror("pthread_create failed");
+        return EXIT_FAILURE;
+    }
+
 //    if(pthread_create(&listener_id, NULL, &pull_changes, NULL) < 0) {
 //        perror("pthread_create failed");
 //        return EXIT_FAILURE;
 //    }
-//
-//    if(pthread_join(tracker_id, NULL) < 0) { perror("pthread_join failed"); return EXIT_FAILURE; }
+
+    if(pthread_join(tracker_id, NULL) < 0) { perror("pthread_join failed"); return EXIT_FAILURE; }
 //    if(pthread_join(listener_id, NULL) < 0) { perror("pthread_join failed"); return EXIT_FAILURE; }
-//
-//    return EXIT_SUCCESS;
+
+    return EXIT_SUCCESS;
 }
