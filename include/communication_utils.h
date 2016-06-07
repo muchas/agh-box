@@ -32,8 +32,10 @@ typedef struct BoxEntry {
 } box_entry_t;
 
 
-void send_file(int socket, const char* path, message_type_t type);
+void send_file(int socket, const char* path, message_type_t type, time_t mod_time);
 message_info_t receive_message_info(int socket);
 void receive_file(int socket, const char* new_path, size_t size);
+void send_message_info(int socket, message_type_t type, const char* path, size_t size, time_t mod_time);
+message_info_t receive_message_info(int socket);
 
 #endif

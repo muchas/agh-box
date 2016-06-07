@@ -17,6 +17,6 @@ server_t get_server(int socket);
 void register_client(server_t* server);
 void add_client(int socket, int* client_array, int* client_num);
 void handle_file_request(int socket, message_info_t info);
-void handle_client_message(int socket);
+void handle_client_message(int socket, server_t* server);
 
 #endif

@@ -69,7 +69,47 @@ int write_box(char *path, box_entry_t *entries)
 void print_box(box_entry_t* head)
 {
     while(head->next != NULL) {
-        printf("%s\n", head->path);
+        printf("%s %d %d\n", head->path, head->global_timestamp, head->local_timestamp);
         head = head->next;
+    }
+}
+
+
+box_entry_t* find_in_box(box_entry_t *box_entry, char *name)
+{
+    box_entry_t *it;
+
+    it = box_entry;
+
+    while(it->next != NULL) {
+        if(strcmp(it->path, name) == 0) {
+            return it;
+        }
+        it = it->next;
+    }
+
+    return NULL;
+}
+
+
+void create_or_update(box_entry_t *box_entry, char *name, size_t size, time_t local_time, time_t server_time)
+{
+    box_entry_t *entry;
+
+    entry = find_in_box(box_entry, name);
+
+
+    if(entry == NULL) {
+        insert_into_box(box_entry, name, server_time, local_time, -1);
+    } else {
+        strcpy(entry->path, name);
+
+        if(local_time != 0) {
+            entry->local_timestamp = local_time;
+        }
+
+        if(server_time != 0) {
+            entry->global_timestamp = server_time;
+        }
     }
 }

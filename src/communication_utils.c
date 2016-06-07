@@ -5,15 +5,18 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <communication_utils.h>
 #include "communication_utils.h"
+#define HISTORY_DIR "history"
 
 
-void send_message_info(int socket, message_type_t type, const char* path, size_t size)
+void send_message_info(int socket, message_type_t type, const char* path, size_t size, time_t mod_time)
 {
     message_info_t info;
     info.message_type = type;
     strncpy(info.name, path, MAX_PATHLEN);
     info.size = size;
+    info.modification_time = mod_time;
 
     if(write(socket, &info, sizeof(message_info_t)) < sizeof(info))
     {
@@ -27,15 +30,18 @@ void send_file_data(int socket, int fd, size_t size)
 {
     off_t offset = 0;
     int remain_data = size;
-    int sent_bytes;
+    int sent_bytes, len;
+    char buffer[BUFSIZ];
 
-    while (((sent_bytes = sendfile(socket, fd, &offset, BUFSIZ)) > 0) && (remain_data > 0))
+    while ((remain_data > 0) && ((len = read(fd, buffer, BUFSIZ)) > 0))
     {
-        remain_data -= sent_bytes;
+        int num = write(socket, buffer, len);
+        remain_data -= len;
     }
+
 }
 
-void send_file(int socket, const char* path, message_type_t type){
+void send_file(int socket, const char* path, message_type_t type, time_t mod_time){
     int fd;
     struct stat file_stat;
 
@@ -51,8 +57,9 @@ void send_file(int socket, const char* path, message_type_t type){
         exit(EXIT_FAILURE);
     }
 
-    send_message_info(socket, type, path, file_stat.st_size);
+    send_message_info(socket, type, path, file_stat.st_size, mod_time);
     send_file_data(socket, fd, file_stat.st_size);
+    close(fd);
 }
 
 message_info_t receive_message_info(int socket){
@@ -73,10 +80,36 @@ void receive_file(int socket, const char* new_path, size_t size){
     int remain_data = size;
 
     file = fopen(new_path, "w");
-    while (((len = read(socket, buffer, BUFSIZ)) > 0) && (remain_data > 0))
+    while ((remain_data > 0) && ((len = read(socket, buffer, BUFSIZ)) > 0))
     {
-        fwrite(buffer, sizeof(char), len, file);
+        int num =fwrite(buffer, sizeof(char), len, file);
         remain_data -= len;
     }
     fclose(file);
 }
+
+
+void receive_file_history(int socket, const char* new_path, size_t size, time_t timestamp){
+    int len;
+    FILE *file, *file_history;
+    char buffer[BUFSIZ];
+    int remain_data = size;
+    char history_path[MAX_PATHLEN+50]=HISTORY_DIR;
+    char timestamp_s[15]="";
+    sprintf(timestamp_s, "%d", (int)timestamp);
+
+    strcat(history_path, "/");
+    strcat(history_path, &new_path[2]);
+    strcat(history_path, "$");
+    strcat(history_path, timestamp_s);
+    file = fopen(new_path, "w");
+    file_history = fopen(history_path, "w");
+    while ((remain_data > 0) && ((len = read(socket, buffer, BUFSIZ)) > 0))
+    {
+                        int num=fwrite(buffer, sizeof(char), len, file);
+                fwrite(buffer, sizeof(char), len, file_history);
+                       remain_data -= len;
+                   }
+            fclose(file);
+        fclose(file_history);
+    }

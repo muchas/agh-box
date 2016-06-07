@@ -1,21 +1,24 @@
 #include <sys/select.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <server.h>
+#include <communication_utils.h>
 #include "server.h"
 #include "communication_utils.h"
+#include "box_utils.h"
 #include "socket_utils.h"
-#define SERVER_BOX_FILENAME ".server_box"
-#define LOCAL_BOX_FILENAME ".box"
+#define SERVER_BOX_FILENAME ".origin_server_box"
+#define HISTORY_DIR "history"
 
 
-int main(){
-    struct sockaddr addr;
-    server_t server;
-    socklen_t len;
+int max(int a, int b) {
+    return a > b ? a : b;
+}
 
-    int socket = init_server_socket(9000);
-    server=get_server(socket);
-    run(server);
 
-    return EXIT_SUCCESS;
+int file_exists(char* filename)
+{
+    return access(filename, F_OK);
 }
 
 
@@ -38,7 +41,7 @@ void run(server_t server){
                     register_client(&server);
                 }
                 else{
-                    handle_client_message(fd);
+                    handle_client_message(fd, &server);
                 }
             }
         }
@@ -60,11 +63,22 @@ server_t get_server(int socket){
 void register_client(server_t* server){
     int client_fd;
     client_fd = accept(server->socket, NULL, 0);
+
+    printf("Registering new client, fd: %d \n", client_fd);
+
     if(client_fd<0){
         perror("accept error");
         exit(EXIT_FAILURE);
     }
+
+    server->highest_fd = max(server->highest_fd, client_fd);
+    FD_SET(client_fd, &server->server_fd_set);
+
     add_client(client_fd, server->client_array, &server->client_num);
+
+    printf("Sending server box to client\n");
+
+    send_file(client_fd, SERVER_BOX_FILENAME, SERVER_BOX, 0);
 }
 
 void add_client(int socket, int* client_array, int* client_num){
@@ -77,24 +91,101 @@ void add_client(int socket, int* client_array, int* client_num){
 }
 
 void handle_file_request(int socket, message_info_t info){
-    send_file(socket, info.name, SERVER_FILE);
+    box_entry_t *entries, *entry;
+
+    entries = read_box(SERVER_BOX_FILENAME);
+    entry = find_in_box(entries, info.name);
+    if(entry==NULL){
+        printf("Error finding file %s\n", info.name);
+        exit(0);
+    }
+
+    send_file(socket, info.name, SERVER_FILE, entry->global_timestamp);
 }
 
-void handle_client_file(int socket, message_info_t info){
+void broadcast_box(int sender_socket_fd, server_t *server)
+{
+    int i;
+
+    for(i=0; i<server->client_num; i+=1) {
+        if(sender_socket_fd != server->client_array[i]) {
+            printf("Brodacasting box to FD: %d \n", server->client_array[i]);
+            send_file(server->client_array[i], SERVER_BOX_FILENAME, SERVER_BOX, 0);
+        }
+    }
+}
+
+
+void handle_client_file(int socket, message_info_t *info, server_t *server){
     box_entry_t* head;
+
+    receive_file_history(socket, info->name, info->size, info->modification_time);
+
     head = read_box(SERVER_BOX_FILENAME);
+    create_or_update(head, info->name, info->size, info->modification_time, info->modification_time);
+    // broadcast
+
+    write_box(SERVER_BOX_FILENAME, head);
+
+    broadcast_box(socket, server);
 }
 
-void handle_client_message(int socket){
+void handle_client_message(int socket, server_t *server){
+    ssize_t read_bytes;
     message_info_t info;
-    read(socket, &info, sizeof(info));
+
+    read_bytes = read(socket, &info, sizeof(info));
+
 
     switch(info.message_type){
         case FILE_REQUEST:
+            printf("Received FILE_REQUEST %s\n", info.name);
             handle_file_request(socket, info);
+            break;
         case CLIENT_FILE:
-            handle_client_file(socket, info);
+            printf("Received CLIENT_FILE %s from %d\n", info.name, socket);
+            handle_client_file(socket, &info, server);
+            break;
         default:
             break;
     }
+}
+
+
+
+void init()
+{
+    int fd;
+
+    if(file_exists(SERVER_BOX_FILENAME) != 0)  {
+        fd = creat(SERVER_BOX_FILENAME, 0666);
+        close(fd);
+    }
+}
+
+
+int main(int argc, char *argv[]){
+    struct sockaddr addr;
+    server_t server;
+    socklen_t len;
+
+    if(argc!=2){
+          printf("invalid number of arguments");
+          exit(0);
+    }
+
+    struct stat st = {0};
+    if (stat(HISTORY_DIR, &st) == -1) {
+            mkdir(HISTORY_DIR, 0755);
+    }
+
+    chdir("./server_");
+
+    init();
+
+    int socket = init_server_socket(atoi(argv[1]));
+    server=get_server(socket);
+    run(server);
+
+    return EXIT_SUCCESS;
 }
