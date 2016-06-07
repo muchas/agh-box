@@ -181,10 +181,10 @@ int push_local_changes(stack_t* changes)
                 create_or_update(local_box, message->name, message->size, message->modification_time, message->modification_time);
                 break;
             case FILE_REMOVAL:
-                printf("FILE REMOVAL; LET'S PRETEND IT'S REMOVED. TODO :-)\n");
+                //printf("FILE REMOVAL; LET'S PRETEND IT'S REMOVED. TODO :-)\n");
                 break;
             default:
-                printf("I have no idea what is happening he;)\n");
+                //printf("I have no idea what is happening he;)\n");
                 break;
         }
     }

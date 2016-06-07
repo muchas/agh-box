@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <communication_utils.h>
 #include "communication_utils.h"
+#define HISTORY_DIR "history"
 
 
 void send_message_info(int socket, message_type_t type, const char* path, size_t size, time_t mod_time)
@@ -86,3 +87,29 @@ void receive_file(int socket, const char* new_path, size_t size){
     }
     fclose(file);
 }
+
+
+void receive_file_history(int socket, const char* new_path, size_t size, time_t timestamp){
+    int len;
+    FILE *file, *file_history;
+    char buffer[BUFSIZ];
+    int remain_data = size;
+    char history_path[MAX_PATHLEN+50]=HISTORY_DIR;
+    char timestamp_s[15]="";
+    sprintf(timestamp_s, "%d", (int)timestamp);
+
+    strcat(history_path, "/");
+    strcat(history_path, &new_path[2]);
+    strcat(history_path, "$");
+    strcat(history_path, timestamp_s);
+    file = fopen(new_path, "w");
+    file_history = fopen(history_path, "w");
+    while ((remain_data > 0) && ((len = read(socket, buffer, BUFSIZ)) > 0))
+    {
+                        int num=fwrite(buffer, sizeof(char), len, file);
+                fwrite(buffer, sizeof(char), len, file_history);
+                       remain_data -= len;
+                   }
+            fclose(file);
+        fclose(file_history);
+    }

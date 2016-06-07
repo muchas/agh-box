@@ -8,6 +8,7 @@
 #include "box_utils.h"
 #include "socket_utils.h"
 #define SERVER_BOX_FILENAME ".origin_server_box"
+#define HISTORY_DIR "history"
 
 
 int max(int a, int b) {
@@ -118,7 +119,7 @@ void broadcast_box(int sender_socket_fd, server_t *server)
 void handle_client_file(int socket, message_info_t *info, server_t *server){
     box_entry_t* head;
 
-    receive_file(socket, info->name, info->size);
+    receive_file_history(socket, info->name, info->size, info->modification_time);
 
     head = read_box(SERVER_BOX_FILENAME);
     create_or_update(head, info->name, info->size, info->modification_time, info->modification_time);
@@ -167,6 +168,16 @@ int main(int argc, char *argv[]){
     struct sockaddr addr;
     server_t server;
     socklen_t len;
+
+    if(argc!=2){
+          printf("invalid number of arguments");
+          exit(0);
+    }
+
+    struct stat st = {0};
+    if (stat(HISTORY_DIR, &st) == -1) {
+            mkdir(HISTORY_DIR, 0755);
+    }
 
     chdir("./server_");
 
