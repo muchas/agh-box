@@ -101,9 +101,11 @@ void create_or_update(box_entry_t *box_entry, char *name, size_t size, time_t lo
     printf("Updating box... Name: %s, local time: %d\n", name, local_time);
 
     if(entry == NULL) {
+        printf("Entry not found create new\n");
         insert_into_box(box_entry, name, server_time, local_time, -1);
     } else {
-        strcpy(box_entry->path, name);
+        printf("Entry found updating\n");
+        strcpy(entry->path, name);
 
         if(local_time != 0) {
             entry->local_timestamp = local_time;

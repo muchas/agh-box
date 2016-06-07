@@ -29,11 +29,18 @@ void send_file_data(int socket, int fd, size_t size)
 {
     off_t offset = 0;
     int remain_data = size;
-    int sent_bytes;
+    int sent_bytes, len;
+    char buffer[BUFSIZ];
 
-    while (((sent_bytes = sendfile(socket, fd, &offset, BUFSIZ)) > 0) && (remain_data > 0))
+//    while (((sent_bytes = sendfile(socket, fd, &offset, BUFSIZ)) > 0) && (remain_data > 0))
+//    {
+//        remain_data -= sent_bytes;
+//    }
+
+    while ((remain_data > 0) && ((len = read(fd, buffer, BUFSIZ)) > 0))
     {
-        remain_data -= sent_bytes;
+        int num = write(socket, buffer, len);
+        remain_data -= len;
     }
 
     printf("File has been sent\n");
@@ -59,6 +66,7 @@ void send_file(int socket, const char* path, message_type_t type, time_t mod_tim
     send_message_info(socket, type, path, file_stat.st_size, mod_time);
     printf("Sending file data\n");
     send_file_data(socket, fd, file_stat.st_size);
+    close(fd);
 }
 
 message_info_t receive_message_info(int socket){
@@ -83,8 +91,9 @@ void receive_file(int socket, const char* new_path, size_t size){
     printf("Receiving message file, size: %d\n", size);
     while ((remain_data > 0) && ((len = read(socket, buffer, BUFSIZ)) > 0))
     {
-        printf("Reading... %d\n", remain_data);
-        fwrite(buffer, sizeof(char), len, file);
+        printf("Reading... %d %c\n", remain_data, buffer[0]);
+        int num =fwrite(buffer, sizeof(char), len, file);
+        printf("writed %d bytes to file %s\n", num, new_path);
         remain_data -= len;
     }
     fclose(file);

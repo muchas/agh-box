@@ -94,6 +94,10 @@ void handle_file_request(int socket, message_info_t info){
 
     entries = read_box(SERVER_BOX_FILENAME);
     entry = find_in_box(entries, info.name);
+    if(entry==NULL){
+        printf("Error finding file %s\n", info.name);
+        exit(0);
+    }
 
     send_file(socket, info.name, SERVER_FILE, entry->global_timestamp);
 }
@@ -117,8 +121,12 @@ void handle_client_file(int socket, message_info_t *info, server_t *server){
     receive_file(socket, info->name, info->size);
 
     head = read_box(SERVER_BOX_FILENAME);
-    create_or_update(head, info->name, info->size, 0, info->modification_time);
+    create_or_update(head, info->name, info->size, info->modification_time, info->modification_time);
     // broadcast
+
+    printf("Printing box\n");
+    print_box(head);
+    printf("\n");
     write_box(SERVER_BOX_FILENAME, head);
 
     broadcast_box(socket, server);
