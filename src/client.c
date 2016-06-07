@@ -114,8 +114,7 @@ stack_t* detect_local_changes(file_t *local_files, box_entry_t* box_entries)
 
     files_it = local_files;
 
-//    printf("Printing local box in detect_local_changes\n");
-//    print_box(box_entries);
+
 
     while(files_it->next != NULL) {
         box_it = box_entries;
@@ -126,7 +125,6 @@ stack_t* detect_local_changes(file_t *local_files, box_entry_t* box_entries)
                 is_found = 1;
 
                 if(files_it->modification_time > box_it->local_timestamp) {
-                    printf("Modification time > local timestamp\n");
                     message = create_info_message(CLIENT_FILE, files_it->path, files_it->modification_time, (size_t)files_it->size);
                     push(stack, message);
                     break;
@@ -136,7 +134,6 @@ stack_t* detect_local_changes(file_t *local_files, box_entry_t* box_entries)
         }
 
         if(is_found < 0) {
-            printf("File is not found in the local box\n");
             message = create_info_message(CLIENT_FILE, files_it->path, files_it->modification_time, (size_t)files_it->size);
             push(stack, message);
         }
@@ -192,7 +189,6 @@ int push_local_changes(stack_t* changes)
         }
     }
 
-    printf("Local changes pushed\n");
 
     return 0;
 }
@@ -234,11 +230,10 @@ int apply_server_changes(stack_t *changes)
                 received_message = receive_message_info(socket_fd);
 
                 if(received_message.message_type == SERVER_FILE) {
-                    printf("Receiving file from server...\n");
                     receive_file(socket_fd, received_message.name, received_message.size);
-                    printf("Server file has been received...\n");
                     stat(received_message.name, &st);
                     create_or_update(local_box, received_message.name, received_message.size, st.st_mtime, received_message.modification_time);
+                    printf("Updated box\n");
                 } else if(received_message.message_type == SERVER_BOX) {
                     printf("Hey server, you fucked up\n");
                 }
@@ -249,7 +244,6 @@ int apply_server_changes(stack_t *changes)
         }
     }
 
-    printf("Server changes applied\n");
 
     return 0;
 }
@@ -284,8 +278,7 @@ void* pull_changes(void *parameters)
         apply_server_changes(changes);
         write_box(LOCAL_BOX_FILENAME, local_box);
 
-        printf("Iteration: %d\n", i);
-        i += 1;
+
     }
 
     return NULL;
@@ -302,15 +295,12 @@ void* track_directory(void *parameters)
     while(1) {
         // acquire lock]
         local_files = get_local_files_list(".");
-//        printf("Got local files list\n");
         changes = detect_local_changes(local_files, local_box);
-//        printf("Changes has been detected\n");
-//        printf("Pushing local changes\n");
+
         push_local_changes(changes);
-//        printf("Writing to local box\n");
+
         write_box(LOCAL_BOX_FILENAME, local_box);
         // release lock
-//        printf("Iteration: %d\n", i);
         i += 1;
         sleep(SYNC_TIME);
     }

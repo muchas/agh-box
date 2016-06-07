@@ -124,9 +124,6 @@ void handle_client_file(int socket, message_info_t *info, server_t *server){
     create_or_update(head, info->name, info->size, info->modification_time, info->modification_time);
     // broadcast
 
-    printf("Printing box\n");
-    print_box(head);
-    printf("\n");
     write_box(SERVER_BOX_FILENAME, head);
 
     broadcast_box(socket, server);
@@ -138,14 +135,16 @@ void handle_client_message(int socket, server_t *server){
 
     read_bytes = read(socket, &info, sizeof(info));
 
-    printf("Handle client message, size: %d\n", read_bytes);
 
     switch(info.message_type){
         case FILE_REQUEST:
+            printf("Received FILE_REQUEST %s\n", info.name);
             handle_file_request(socket, info);
+            break;
         case CLIENT_FILE:
-            printf("Received CLIENT_FILE %s\n", info.name);
+            printf("Received CLIENT_FILE %s from %d\n", info.name, socket);
             handle_client_file(socket, &info, server);
+            break;
         default:
             break;
     }
@@ -158,7 +157,6 @@ void init()
     int fd;
 
     if(file_exists(SERVER_BOX_FILENAME) != 0)  {
-        printf("Creating server box\n");
         fd = creat(SERVER_BOX_FILENAME, 0666);
         close(fd);
     }

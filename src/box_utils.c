@@ -69,7 +69,7 @@ int write_box(char *path, box_entry_t *entries)
 void print_box(box_entry_t* head)
 {
     while(head->next != NULL) {
-        printf("%s\n", head->path);
+        printf("%s %d %d\n", head->path, head->global_timestamp, head->local_timestamp);
         head = head->next;
     }
 }
@@ -98,13 +98,10 @@ void create_or_update(box_entry_t *box_entry, char *name, size_t size, time_t lo
 
     entry = find_in_box(box_entry, name);
 
-    printf("Updating box... Name: %s, local time: %d\n", name, local_time);
 
     if(entry == NULL) {
-        printf("Entry not found create new\n");
         insert_into_box(box_entry, name, server_time, local_time, -1);
     } else {
-        printf("Entry found updating\n");
         strcpy(entry->path, name);
 
         if(local_time != 0) {
